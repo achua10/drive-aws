@@ -1,5 +1,8 @@
-from helpers import clean_file_name
+import pytest
 
+from helpers import clean_file_name, validate_size
+
+MAX = 5 * 1024 * 1024  # 5 MB, use the limit from your design doc
 
 def test_normal_name_unchanged():
     assert clean_file_name("report.pdf") == "report.pdf"
@@ -41,3 +44,28 @@ def test_long_name_is_capped_and_keeps_extension():
     result = clean_file_name("a" * 300 + ".txt")
     assert len(result) == 100
     assert result.endswith(".txt")
+
+    # Test the validate_size function
+def test_size_at_limit_passes():
+    assert validate_size(MAX, MAX) is None
+
+
+def test_size_one_byte_over_fails():
+    assert validate_size(MAX + 1, MAX) is not None
+
+
+def test_smallest_valid_size_passes():
+    assert validate_size(1, MAX) is None
+
+
+def test_zero_size_fails():
+    assert validate_size(0, MAX) is not None
+
+
+def test_negative_size_fails():
+    assert validate_size(-5, MAX) is not None
+
+
+@pytest.mark.parametrize("bad", ["abc", "100", None, 5.5, True])
+def test_wrong_type_fails(bad):
+    assert validate_size(bad, MAX) is not None

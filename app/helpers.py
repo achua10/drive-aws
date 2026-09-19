@@ -29,3 +29,14 @@ def clean_file_name(raw_name, max_length=100):
             name = name[:max_length]
 
     return name
+
+def validate_size(size, max_bytes):
+    """Return an error message if size is invalid, or None if it's fine."""
+    # bool is a subclass of int in Python, so reject it explicitly
+    if isinstance(size, bool) or not isinstance(size, int):
+        return "size must be a whole number"
+    if size <= 0:
+        return "size must be greater than zero"
+    if size > max_bytes:
+        return f"size must be at most {max_bytes} bytes"
+    return None
