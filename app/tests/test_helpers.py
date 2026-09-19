@@ -1,6 +1,6 @@
 import pytest
 
-from helpers import clean_file_name, validate_size
+from helpers import clean_file_name, validate_size, validate_upload_request
 
 MAX = 5 * 1024 * 1024  # 5 MB, use the limit from your design doc
 
@@ -69,3 +69,35 @@ def test_negative_size_fails():
 @pytest.mark.parametrize("bad", ["abc", "100", None, 5.5, True])
 def test_wrong_type_fails(bad):
     assert validate_size(bad, MAX) is not None
+
+VALID = {"file_name": "report.pdf", "size": 1024, "content_type": "application/pdf"}
+
+
+def test_valid_request_has_no_problems():
+    assert validate_upload_request(VALID, MAX) == []
+
+
+def test_empty_body_lists_all_problems():
+    assert len(validate_upload_request({}, MAX)) == 3
+
+
+@pytest.mark.parametrize("bad_body", [None, [], "text", 5])
+def test_body_that_is_not_a_dict_gives_one_problem(bad_body):
+    assert len(validate_upload_request(bad_body, MAX)) == 1
+
+
+def test_zero_size_gives_exactly_one_problem():
+    assert len(validate_upload_request({**VALID, "size": 0}, MAX)) == 1
+
+
+def test_blank_file_name_is_reported():
+    problems = validate_upload_request({**VALID, "file_name": "   "}, MAX)
+    assert any("file_name" in p for p in problems)
+
+
+@pytest.mark.parametrize("bad_type", ["pdf", "application/", "/pdf", "a b/c", 5, ""])
+def test_bad_content_type_is_reported(bad_type):
+    problems = validate_upload_request({**VALID, "content_type": bad_type}, MAX)
+    assert any("content_type" in p for p in problems)
+
+    

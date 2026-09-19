@@ -1,3 +1,4 @@
+import re
 def clean_file_name(raw_name, max_length=100):
     """Return a safe file name, or "file" if nothing usable is left."""
     default = "file"
@@ -40,3 +41,27 @@ def validate_size(size, max_bytes):
     if size > max_bytes:
         return f"size must be at most {max_bytes} bytes"
     return None
+
+CONTENT_TYPE_PATTERN = re.compile(r"^[\w.+-]+/[\w.+-]+$")
+
+
+def validate_upload_request(body, max_bytes):
+    """Return a list of problems with an upload request (empty list = valid)."""
+    if not isinstance(body, dict):
+        return ["request body must be a JSON object"]
+
+    problems = []
+
+    file_name = body.get("file_name")
+    if not isinstance(file_name, str) or not file_name.strip():
+        problems.append("file_name is required")
+
+    size_problem = validate_size(body.get("size"), max_bytes)
+    if size_problem:
+        problems.append(size_problem)
+
+    content_type = body.get("content_type")
+    if not isinstance(content_type, str) or not CONTENT_TYPE_PATTERN.match(content_type):
+        problems.append("content_type must look like type/subtype, e.g. application/pdf")
+
+    return problems
