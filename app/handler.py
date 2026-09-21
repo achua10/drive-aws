@@ -1,5 +1,6 @@
 import os
 import uuid
+import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from functools import lru_cache
@@ -215,3 +216,29 @@ def delete_file(event):
     table.delete_item(Key={"file_id": file_id})
 
     return make_response(200, {"file_id": file_id, "deleted": True})
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
+ROUTES = {
+    "POST /upload": create_upload,
+    "GET /files": list_files,
+    "GET /files/{id}/download": download_file,
+    "DELETE /files/{id}": delete_file,
+}
+
+
+def lambda_handler(event, context):
+    """Entry point: pick the action for this route, and never leak error details."""
+    route_key = event.get("routeKey") if isinstance(event, dict) else None
+    action = ROUTES.get(route_key) if isinstance(route_key, str) else None
+
+    if action is None:
+        return make_response(404, {"error": "route not found"})
+
+    try:
+        return action(event)
+    except Exception:
+        # Full details go to CloudWatch; the caller only sees a generic message.
+        logger.exception("Unhandled error on route %s", route_key)
+        return make_response(500, {"error": "internal server error"})

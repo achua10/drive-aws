@@ -376,3 +376,55 @@ def test_delete_keeps_record_if_s3_delete_fails(monkeypatch):
         handler.delete_file(download_event())
     assert FILE_ID in table.items
     assert events == []
+
+# ---------- router and safety net tests ----------
+
+def test_all_four_routes_are_registered():
+    assert set(handler.ROUTES) == {
+        "POST /upload",
+        "GET /files",
+        "GET /files/{id}/download",
+        "DELETE /files/{id}",
+    }
+
+
+def test_router_calls_matching_action_with_event(monkeypatch):
+    seen = []
+
+    def fake_action(event):
+        seen.append(event)
+        return handler.make_response(200, {"hit": True})
+
+    monkeypatch.setitem(handler.ROUTES, "GET /files", fake_action)
+    event = {"routeKey": "GET /files"}
+    response = handler.lambda_handler(event, None)
+    assert response["statusCode"] == 200
+    assert seen == [event]
+
+
+@pytest.mark.parametrize("bad_event", [
+    {"routeKey": "GET /nope"},
+    {},
+    {"routeKey": None},
+    {"routeKey": 5},
+])
+def test_unknown_route_returns_404(bad_event):
+    response = handler.lambda_handler(bad_event, None)
+    assert response["statusCode"] == 404
+
+
+def test_unexpected_error_returns_generic_500_and_logs_details(monkeypatch, caplog):
+    def boom(event):
+        raise RuntimeError("secret detail")
+
+    monkeypatch.setitem(handler.ROUTES, "GET /files", boom)
+    response = handler.lambda_handler({"routeKey": "GET /files"}, None)
+    assert response["statusCode"] == 500
+    assert "secret detail" not in response["body"]
+    assert "secret detail" in caplog.text
+
+
+def test_missing_config_returns_500():
+    # clean_env removes BUCKET_NAME and TABLE_NAME, so get_config raises inside the action
+    response = handler.lambda_handler({"routeKey": "POST /upload"}, None)
+    assert response["statusCode"] == 500
