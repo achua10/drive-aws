@@ -7,6 +7,7 @@ import pytest
 
 from helpers import (
     BadRequestError,
+    build_content_disposition,
     build_s3_key,
     clean_file_name,
     make_response,
@@ -195,3 +196,20 @@ def test_non_text_body_raises():
 
 def test_json_list_is_returned_as_is():
     assert read_json_body({"body": "[1, 2]"}) == [1, 2]
+
+def test_content_disposition_plain_name():
+    result = build_content_disposition("report.pdf")
+    assert result == "attachment; filename=\"report.pdf\"; filename*=UTF-8''report.pdf"
+
+
+def test_content_disposition_cannot_be_broken_by_quotes():
+    result = build_content_disposition('a";b.txt')
+    assert '"a__b.txt"' in result
+    assert "a%22%3Bb.txt" in result
+    assert result.count('"') == 2
+
+
+def test_content_disposition_handles_non_ascii():
+    result = build_content_disposition("résumé.pdf")
+    assert '"r_sum_.pdf"' in result
+    assert "r%C3%A9sum%C3%A9.pdf" in result

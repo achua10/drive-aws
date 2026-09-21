@@ -1,6 +1,7 @@
 import base64
 import json
 import re
+from urllib.parse import quote
 from decimal import Decimal
 
 def clean_file_name(raw_name, max_length=100):
@@ -120,3 +121,10 @@ def read_json_body(event):
         return json.loads(raw)
     except json.JSONDecodeError:
         raise BadRequestError("request body is not valid JSON")
+
+#download header for odd file names
+def build_content_disposition(file_name):
+    """Build a download header that is safe even for odd file names."""
+    fallback = re.sub(r"[^A-Za-z0-9._-]", "_", file_name)
+    encoded = quote(file_name, safe="")
+    return f"attachment; filename=\"{fallback}\"; filename*=UTF-8''{encoded}"
