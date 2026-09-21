@@ -61,7 +61,16 @@ def validate_upload_request(body, max_bytes):
         problems.append(size_problem)
 
     content_type = body.get("content_type")
-    if not isinstance(content_type, str) or not CONTENT_TYPE_PATTERN.match(content_type):
+    if not isinstance(content_type, str) or not CONTENT_TYPE_PATTERN.fullmatch(content_type):
         problems.append("content_type must look like type/subtype, e.g. application/pdf")
 
     return problems
+
+FILE_ID_PATTERN = re.compile(r"[A-Za-z0-9-]+")
+
+
+def build_s3_key(file_id):
+    """Return the S3 key for a file ID, or raise ValueError if the ID is unsafe."""
+    if not isinstance(file_id, str) or not FILE_ID_PATTERN.fullmatch(file_id):
+        raise ValueError("file_id must contain only letters, digits and hyphens")
+    return f"uploads/{file_id}"

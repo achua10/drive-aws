@@ -1,6 +1,14 @@
+import uuid
+
 import pytest
 
-from helpers import clean_file_name, validate_size, validate_upload_request
+from helpers import (
+    build_s3_key,
+    clean_file_name,
+    validate_size,
+    validate_upload_request,
+)
+
 
 MAX = 5 * 1024 * 1024  # 5 MB, use the limit from your design doc
 
@@ -95,9 +103,21 @@ def test_blank_file_name_is_reported():
     assert any("file_name" in p for p in problems)
 
 
-@pytest.mark.parametrize("bad_type", ["pdf", "application/", "/pdf", "a b/c", 5, ""])
+@pytest.mark.parametrize("bad_type", ["pdf", "application/", "/pdf", "a b/c", 5, "", "application/pdf\n"])
 def test_bad_content_type_is_reported(bad_type):
     problems = validate_upload_request({**VALID, "content_type": bad_type}, MAX)
     assert any("content_type" in p for p in problems)
 
-    
+def test_key_follows_pattern():
+    assert build_s3_key("abc-123") == "uploads/abc-123"
+
+
+def test_real_uuid_works():
+    file_id = str(uuid.uuid4())
+    assert build_s3_key(file_id) == f"uploads/{file_id}"
+
+
+@pytest.mark.parametrize("bad", ["", "a/b", "../x", "a\\b", "abc\n", "a b", None, 5])
+def test_unsafe_ids_raise(bad):
+    with pytest.raises(ValueError):
+        build_s3_key(bad)
