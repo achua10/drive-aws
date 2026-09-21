@@ -1,3 +1,4 @@
+import base64
 import json
 import uuid
 from decimal import Decimal
@@ -5,13 +6,14 @@ from decimal import Decimal
 import pytest
 
 from helpers import (
+    BadRequestError,
     build_s3_key,
     clean_file_name,
     make_response,
+    read_json_body,
     validate_size,
     validate_upload_request,
 )
-
 
 MAX = 5 * 1024 * 1024  # 5 MB, use the limit from your design doc
 
@@ -154,3 +156,42 @@ def test_fractional_decimal_becomes_float():
 def test_unsupported_type_raises():
     with pytest.raises(TypeError):
         make_response(200, {"x": object()})
+
+def test_plain_json_body_is_parsed():
+    assert read_json_body({"body": '{"a": 1}'}) == {"a": 1}
+
+
+def test_missing_body_gives_empty_dict():
+    assert read_json_body({}) == {}
+
+
+def test_empty_body_gives_empty_dict():
+    assert read_json_body({"body": ""}) == {}
+
+
+def test_whitespace_body_gives_empty_dict():
+    assert read_json_body({"body": "   "}) == {}
+
+
+def test_invalid_json_raises():
+    with pytest.raises(BadRequestError):
+        read_json_body({"body": "{not json"})
+
+
+def test_base64_body_is_decoded():
+    encoded = base64.b64encode(json.dumps({"a": 1}).encode("utf-8")).decode("ascii")
+    assert read_json_body({"body": encoded, "isBase64Encoded": True}) == {"a": 1}
+
+
+def test_invalid_base64_raises():
+    with pytest.raises(BadRequestError):
+        read_json_body({"body": "!!!", "isBase64Encoded": True})
+
+
+def test_non_text_body_raises():
+    with pytest.raises(BadRequestError):
+        read_json_body({"body": 5})
+
+
+def test_json_list_is_returned_as_is():
+    assert read_json_body({"body": "[1, 2]"}) == [1, 2]

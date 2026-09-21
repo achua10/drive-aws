@@ -1,3 +1,4 @@
+import base64
 import json
 import re
 from decimal import Decimal
@@ -92,3 +93,30 @@ def make_response(status_code, body):
         "headers": {"Content-Type": "application/json"},
         "body": json.dumps(body, default=_json_default),
     }
+
+class BadRequestError(ValueError):
+    """Raised when the request can't be understood (the handler maps it to HTTP 400)."""
+
+
+def read_json_body(event):
+    """Return the parsed JSON body of an API Gateway event ({} if there is none)."""
+    raw = event.get("body")
+
+    if raw is None:
+        return {}
+    if not isinstance(raw, str):
+        raise BadRequestError("request body must be text")
+
+    if event.get("isBase64Encoded"):
+        try:
+            raw = base64.b64decode(raw, validate=True).decode("utf-8")
+        except ValueError:
+            raise BadRequestError("request body is not valid base64 text")
+
+    if not raw.strip():
+        return {}
+
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        raise BadRequestError("request body is not valid JSON")
