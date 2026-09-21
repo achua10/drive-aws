@@ -1,4 +1,7 @@
+import json
 import re
+from decimal import Decimal
+
 def clean_file_name(raw_name, max_length=100):
     """Return a safe file name, or "file" if nothing usable is left."""
     default = "file"
@@ -74,3 +77,18 @@ def build_s3_key(file_id):
     if not isinstance(file_id, str) or not FILE_ID_PATTERN.fullmatch(file_id):
         raise ValueError("file_id must contain only letters, digits and hyphens")
     return f"uploads/{file_id}"
+
+def _json_default(value):
+    """Convert types JSON can't handle by default (DynamoDB returns Decimal)."""
+    if isinstance(value, Decimal):
+        return int(value) if value == value.to_integral_value() else float(value)
+    raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
+
+
+def make_response(status_code, body):
+    """Build the response format API Gateway expects."""
+    return {
+        "statusCode": status_code,
+        "headers": {"Content-Type": "application/json"},
+        "body": json.dumps(body, default=_json_default),
+    }

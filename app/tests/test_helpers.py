@@ -1,10 +1,13 @@
+import json
 import uuid
+from decimal import Decimal
 
 import pytest
 
 from helpers import (
     build_s3_key,
     clean_file_name,
+    make_response,
     validate_size,
     validate_upload_request,
 )
@@ -121,3 +124,33 @@ def test_real_uuid_works():
 def test_unsafe_ids_raise(bad):
     with pytest.raises(ValueError):
         build_s3_key(bad)
+
+def test_response_has_status_code():
+    assert make_response(201, {"ok": True})["statusCode"] == 201
+
+
+def test_response_has_json_header():
+    assert make_response(200, {})["headers"]["Content-Type"] == "application/json"
+
+
+def test_body_is_a_json_string_that_round_trips():
+    original = {"name": "report.pdf", "tags": ["a", "b"]}
+    body = make_response(200, original)["body"]
+    assert isinstance(body, str)
+    assert json.loads(body) == original
+
+
+def test_whole_decimal_becomes_int():
+    value = json.loads(make_response(200, {"size": Decimal("1024")})["body"])["size"]
+    assert value == 1024
+    assert isinstance(value, int)
+
+
+def test_fractional_decimal_becomes_float():
+    value = json.loads(make_response(200, {"x": Decimal("1.5")})["body"])["x"]
+    assert value == 1.5
+
+
+def test_unsupported_type_raises():
+    with pytest.raises(TypeError):
+        make_response(200, {"x": object()})
