@@ -1,0 +1,4 @@
+$kind: http-request
+url: "{{base_url}}/upload"
+method: POST
+order: 1790177258441
